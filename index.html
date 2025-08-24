@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Age and Gender Detection</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #87ceeb, #b0e0e6);
+      color: #222;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      gap: 40px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .chart-container, .container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      animation: fadeIn 1s ease-in-out;
+    }
+    .chart-container {
+      width: 400px;
+      height: fit-content;
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    input[type="file"] {
+      margin-top: 15px;
+      font-size: 16px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      border: 2px solid #3b82f6;
+      background-color: white;
+      cursor: pointer;
+    }
+    .button-group {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      align-items: center;
+    }
+    button {
+      background: linear-gradient(to right, #3b82f6, #60a5fa);
+      color: white;
+      padding: 12px 25px;
+      font-size: 16px;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 15px rgba(96, 165, 250, 0.5);
+    }
+    video, canvas, #previewImage {
+      max-width: 100%;
+      max-height: 250px;
+      border-radius: 10px;
+      margin-top: 15px;
+      display: none;
+    }
+    .result-container {
+      margin-top: 25px;
+      background: #e0efff;
+      padding: 20px;
+      border-radius: 10px;
+      width: 100%;
+      color: #1c2938;
+    }
+    .result-text {
+      font-size: 16px;
+      white-space: pre-line;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="chart-container">
+    <h2>India Population by Gender (Millions)</h2>
+    <canvas id="populationChart" width="400" height="300"></canvas>
+  </div>
+
+  <div class="container">
+    <h2>🎯 Age & Gender Detection</h2>
+
+    <input type="file" id="imageInput" accept="image/*" /><br />
+    <div class="button-group">
+      <button onclick="startCamera()">📷 Use Camera</button>
+      <button onclick="predict()">🚀 Predict Now</button>
+    </div>
+
+    <video id="video" autoplay></video>
+    <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
+    <button id="captureBtn" onclick="captureAndPredict()" style="display: none;">📸 Capture & Predict</button>
+
+    <img id="previewImage" src="#" alt="Captured Image" />
+
+    <div class="result-container">
+      <h3>🔍 Prediction Result:</h3>
+      <div class="result-text" id="output">Waiting for image...</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const previewImage = document.getElementById('previewImage');
+    const captureBtn = document.getElementById('captureBtn');
+    let selectedImage = null;
+
+    document.getElementById('imageInput').addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        previewImage.src = e.target.result;
+        previewImage.style.display = 'block';
+        video.style.display = 'none';
+        captureBtn.style.display = 'none';
+        selectedImage = file;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    async function startCamera() {
+      previewImage.style.display = 'none';
+      captureBtn.style.display = 'inline-block';
+      video.style.display = 'block';
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert('Camera Error: ' + err.message);
+      }
+    }
+
+    function captureAndPredict() {
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        previewImage.src = canvas.toDataURL('image/jpeg');
+        previewImage.style.display = 'block';
+        video.style.display = 'none';
+        captureBtn.style.display = 'none';
+        selectedImage = blob;
+      }, 'image/jpeg');
+    }
+
+    async function predict() {
+      if (!selectedImage) return alert("Please upload or capture an image first!");
+
+      const formData = new FormData();
+      formData.append('image', selectedImage);
+
+      try {
+        const res = await fetch('http://127.0.0.1:5000/predict', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await res.text();
+        document.getElementById('output').innerText = result;
+      } catch (err) {
+        document.getElementById('output').innerText = "❌ Error: " + err.message;
+      }
+    }
+
+    // Chart
+    const ctx = document.getElementById('populationChart').getContext('2d');
+    let male = [600, 620, 640, 660, 680, 700, 720, 740];
+    let female = [570, 590, 610, 630, 650, 670, 690, 710];
+    let other = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5];
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['2010','2012','2014','2016','2018','2020','2022','2024'],
+        datasets: [
+          { label: 'Male', data: male, backgroundColor: '#3b82f6' },
+          { label: 'Female', data: female, backgroundColor: '#60a5fa' },
+          { label: 'Others', data: other, backgroundColor: '#2563eb' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Population (millions)' }
+          },
+          x: {
+            title: { display: true, text: 'Year' }
+          }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+
+    setInterval(() => {
+      chart.data.datasets[0].data = male.map(m => m + Math.random() * 10);
+      chart.data.datasets[1].data = female.map(f => f + Math.random() * 10);
+      chart.data.datasets[2].data = other.map(o => o + Math.random() * 0.5);
+      chart.update();
+    }, 3000);
+  </script>
+</body>
+</html>
